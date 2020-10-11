@@ -1,6 +1,6 @@
-module rtmidi
+module midi
 
-#flag -I@VROOT/modules/rtmidi
+#flag -I@VROOT/modules/midi
 #include "rtmidi_c.h"
 #flag -lrtmidi
 

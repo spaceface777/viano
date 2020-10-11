@@ -7,14 +7,7 @@ fn (mut app App) parse_midi_event(buf []byte) {
 		0x80, /* note down */ 0x90 /* note up */ {
 			assert buf.len > 2
 			note, velocity := buf[1] & 0x7F, buf[2] & 0x7F
-			typ := if velocity == 0 {
-				// app.play(note)
-				'off'
-			} else {
-				app.stop(note)
-				'on (velocity=$velocity)'
-			}
-			println('MIDI note $note $typ on channel $channel')
+			if velocity == 0 { app.pause(note) } else { app.play(note) }
 		} 0xB0 /* control change */ {
 			assert buf.len > 2
 			control, value := buf[1] & 0x7F, buf[2] & 0x7F

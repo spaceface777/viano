@@ -1,46 +1,38 @@
 
-import math
-import miniaudio as ma
+import audio
 import os
-import time
 import midi
 
 struct App {
 mut:
-	input   midi.Input
-	device  &ma.Device
-	samples map[string]&ma.Sound
+	input_ctx midi.Input
+	audio_ctx &audio.Context
 }
 
 fn main() {
-	input := midi.new_in()
-    count := input.get_port_count()?
-    println('There are $count ports')
-    if count == 0 { exit(1) }
+	input_ctx := midi.new_in()
+    port_count := input_ctx.get_port_count()?
+    println('There are $port_count ports')
+    if port_count == 0 { exit(1) }
 
-	for i in 0 .. count {
-		name := input.get_port_name(i)?
+	for i in 0 .. port_count {
+		name := input_ctx.get_port_name(i)?
 		println(' $i: $name')
 	}
 
 	num := os.input('Enter port number: ').int()
-	input.open_port(num, 'TEST IN')?
+	input_ctx.open_port(num, 'TEST IN')?
 	println('Opened port $num successfully\n')
 
-	mut app := &App{
-		input: input
-		device: ma.device()
-	}
-	app.device.volume(0.5)
+	audio_ctx := audio.new_context()
 
-	for i := -12; i < 12; i++ {
-		mut s := ma.sound_rate('./samples/60.wav', u32(44100 * math.powf(2, f32(i) / 12)))
-		app.samples[(60 - i).str()] = s
-		app.device.add((60 - i).str(), s)
+	mut app := &App{
+		input_ctx: input_ctx
+		audio_ctx: audio_ctx
 	}
 
     for {
-        buf, _ := input.get_message() or { continue }
+        buf, _ := input_ctx.get_message() or { continue }
 		app.parse_midi_event(buf)
     }
 }
