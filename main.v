@@ -1,13 +1,19 @@
-
-import audio
 import os
+import time
+import audio
 import midi
 
 struct App {
 mut:
-	input_ctx midi.Input
-	audio_ctx &audio.Context
+	input_ctx       &midi.Input
+	audio_ctx       &audio.Context
+	sustained_notes []byte
+	is_sustain      bool
 }
+
+const (
+	port_name = 'V midi input'
+)
 
 fn main() {
 	input_ctx := midi.new_in()
@@ -20,11 +26,16 @@ fn main() {
 		println(' $i: $name')
 	}
 
-	num := os.input('Enter port number: ').int()
-	input_ctx.open_port(num, 'TEST IN')?
-	println('Opened port $num successfully\n')
+	if port_count == 1 {
+		input_ctx.open_port(0, port_name)?
+		println('\nOpened port 0, since it was the only available port\n')
+	} else {
+		num := os.input('\nEnter port number: ').int()
+		input_ctx.open_port(num, port_name)?
+		println('Opened port $num successfully\n')
+	}
 
-	audio_ctx := audio.new_context()
+	audio_ctx := audio.new_context(wave_kind: .triangle)
 
 	mut app := &App{
 		input_ctx: input_ctx
@@ -34,5 +45,6 @@ fn main() {
     for {
         buf, _ := input_ctx.get_message() or { continue }
 		app.parse_midi_event(buf)
+		time.sleep_ms(3)
     }
 }

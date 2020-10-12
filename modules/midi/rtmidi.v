@@ -26,8 +26,8 @@ pub struct Input {
 	buf  byteptr
 }
 
-pub fn new_in() Input {
-	return {
+pub fn new_in() &Input {
+	return &Input{
 		ptr: C.rtmidi_in_create_default()
 		buf: malloc(read_size)
 	}
@@ -51,6 +51,9 @@ pub fn (i &Input) open_port(port int, name string) ? {
 }
 
 pub fn (i &Input) get_message() ?([]byte, f64) {
+	// TODO remove: tcc segfaults without this line (??)
+	_ = i
+
 	mut len := u32(read_size)
 	offset := C.rtmidi_in_get_message(i.ptr, &i.buf, &len)
 	if !i.ptr.ok { return none }

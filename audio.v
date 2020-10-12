@@ -6,9 +6,9 @@ fn midi2freq(midi byte) f32 {
 }
 
 [inline]
-fn (mut app App) play(note byte) {
+fn (mut app App) play(note, vol byte) {
 	freq := midi2freq(note)
-	app.audio_ctx.play(freq, 0.2)
+	app.audio_ctx.play(freq, f32(vol) / 127 / 4)
 }
 
 [inline]
