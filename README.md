@@ -1,4 +1,4 @@
-# v-midi
+# viano
 MIDI piano V app, including dedicated midi input and audio modules. Supports generating sound waves (sine/triangle/sawtooth/square), and automatic loading and repitching (soon) of audio samples
 
 
