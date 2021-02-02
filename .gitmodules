@@ -1,0 +1,8 @@
+[submodule "vidi"]
+	path = vidi
+	url = https://github.com/vmulti/vidi
+	branch = main
+[submodule "audio"]
+	path = audio
+	url = https://github.com/vmulti/audio
+	branch = main

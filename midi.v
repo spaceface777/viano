@@ -1,4 +1,4 @@
-fn (mut app App) parse_midi_event(buf []byte) {
+fn parse_midi_event(buf []byte, timestamp f64, mut app App) {
 	if buf.len < 1 { return }
 	// println('\nRead $buf.len MIDI bytes: $buf.hex()')
 
