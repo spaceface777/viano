@@ -12,11 +12,11 @@ fn parse_midi_event(buf []byte, timestamp f64, mut app App) {
 			if velocity == 0 {
 				// if !app.is_sustain {
 					// app.sustained_notes = app.sustained_notes.filter(it != note)
-					app.pause(note)
+					app.pause_note(note)
 				// }
 			} else {
 				// app.sustained_notes << note
-				app.play(note, velocity)
+				app.play_note(note, velocity)
 			}
 			// println('$velocity | $app.is_sustain | ${app.sustained_notes.map(int(it))}')
 		} 0xB0 /* control change */ {
@@ -26,7 +26,7 @@ fn parse_midi_event(buf []byte, timestamp f64, mut app App) {
 				0x40 {
 					if value < 0x40 {
 						for note in app.sustained_notes {
-							app.pause(note)
+							app.pause_note(note)
 						}
 						app.sustained_notes = []
 						app.is_sustain = false
