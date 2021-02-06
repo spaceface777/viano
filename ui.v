@@ -80,7 +80,7 @@ fn (app &App) draw() {
 			len_px := (100 * len) / bar_area_height
 			bcolor := note_color(midi, press.velocity)
 			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(kw), len_px, bcolor)
-			}
+		}
 		i++
 	}
 
@@ -97,6 +97,16 @@ fn (app &App) draw() {
 		color := if key.pressed { pressed_black_key_color } else { black_key_color }
 		app.gg.draw_rect(startx, starty, bkw, bkh, color)
 		i++
+
+		// draw note bars
+		for press in key.presses {
+			end := if press.end == 0 { t } else { press.end }
+			offset := f32(t - end)
+			len := f32(end - press.start)
+			len_px := (100 * len) / bar_area_height
+			bcolor := note_color(midi, press.velocity)
+			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(bkw), len_px, bcolor)
+		}
 	}
 }
 
