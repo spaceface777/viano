@@ -7,6 +7,7 @@ MIDI piano V app, including dedicated midi input and audio modules. Supports gen
 `v -cc tcc -cg run src/` for compiling/running a debug binary;  
 `v -prod -compress -o vmidi src/` for compiling a production binary
 
-### Dependencies
+### External Dependencies
 
-For now, you will need `librtmidi` installed for midi input. This dependency will be removed eventually, but for now you'll need to e.g. `sudo apt install librtmidi4`
+None - all libraries used are written in V, and only have the standard dependencies required by the V standard library modules :)
+Previous versions depended on rtmidi, but viano now uses [vidi](https://github.com/vmulti/vidi), a pure-V realtime midi library.
