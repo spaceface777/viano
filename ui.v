@@ -1,4 +1,4 @@
-import gg
+﻿import gg
 import gx
 import sokol.sapp
 import time
@@ -26,16 +26,17 @@ enum KeyColor { black white }
 
 const octave = [KeyColor.white, .black, .white, .black, .white, .white, .black, .white, .black, .white, .black, .white]!
 
-struct PressTimes {
-mut:
-	start i64
-	end   i64
-}
-
 struct Keypress {
 mut:
+	start    i64
+	end      i64
+	velocity byte
+}
+
+struct Key {
+mut:
 	pressed     bool
-	press_times []PressTimes
+	presses     []Keypress
 }
 
 fn init(mut app App) {
@@ -72,17 +73,14 @@ fn (app &App) draw() {
 		app.gg.draw_empty_rounded_rect(startx, starty, kw / 2, height / 2, f32(kw) / 6, gx.black)
 
 		// draw note bars
-		// if key.pressed {
-			for time in key.press_times {
-				// end := if time.end == 0 && key.pressed { t } else if time.end == 0 { time.start } else { time.end }
-				end := if time.end == 0 { t } else { time.end }
-				offset := f32(t - end)
-				len := f32(end - time.start)
-				len_px := (100 * len) / bar_area_height
-				bcolor := gx.rgb(80, 120, 250)
-				app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(kw), len_px, bcolor)
-				}
-			// }
+		for press in key.presses {
+			end := if press.end == 0 { t } else { press.end }
+			offset := f32(t - end)
+			len := f32(end - press.start)
+			len_px := (100 * len) / bar_area_height
+			bcolor := note_color(midi, press.velocity)
+			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(kw), len_px, bcolor)
+			}
 		i++
 	}
 
@@ -114,6 +112,7 @@ fn event(e &sapp.Event, mut app App) {
 
 		}
 		.mouse_down {
+			if e.mouse_y < app.win_height - app.key_height { return }
 			if e.mouse_button == .left {
 				app.dragging = true
 				mut note, mut i := app.start_note, 0
@@ -128,6 +127,7 @@ fn event(e &sapp.Event, mut app App) {
 			}
 		}
 		.mouse_up {
+			if e.mouse_y < app.win_height - app.key_height { return }
 			if e.mouse_button == .left {
 				app.dragging = false
 				mut note, mut i := app.start_note, 0
@@ -178,7 +178,6 @@ fn event(e &sapp.Event, mut app App) {
 					exit(0)
 				}
 				.left {
-					println('$app.start_note | $app.white_key_count')
 					if app.start_note + app.white_key_count < 127 {
 						for {
 							app.start_note++
@@ -187,7 +186,6 @@ fn event(e &sapp.Event, mut app App) {
 					}
 				}
 				.right {
-					println(app.start_note)
 					if app.start_note > 0 {
 						for {
 							app.start_note--

@@ -1,5 +1,4 @@
 import gg
-import os
 import time
 
 import audio
@@ -17,7 +16,7 @@ mut:
 	key_width       f32
 	key_height      f32
 	white_key_count int
-	keys            map[byte]Keypress
+	keys            map[byte]Key
 	start_note      byte = 36
 	dragging        bool
 }
@@ -25,20 +24,22 @@ mut:
 [inline]
 fn (mut app App) play_note(note byte, vol_ byte) {
 	app.keys[note].pressed = true
-	app.keys[note].press_times << { start: time.ticks() }
+	app.keys[note].presses << { start: time.ticks(), velocity: vol_ }
 	freq := midi2freq(note)
 
 	// // make the bass notes louder
 	// vol := f32(vol_ + 20 * (128 - note)) / 127 / 8 // + (128 - note) 
-	vol := f32(vol_) / 127 / 32
+	vol := f32(vol_) / 127 / damp_ratio
 	app.audio.play(freq, vol)
 }
 
 [inline]
 fn (mut app App) pause_note(note byte) {
+	if !app.keys[note].pressed { return }
 	app.keys[note].pressed = false
-	if app.keys[note].press_times.len > 0 {
-		app.keys[note].press_times[app.keys[note].press_times.len - 1].end = time.ticks()
+	if app.keys[note].presses.len > 0 {
+		mut t := app.keys[note].presses
+		t[t.len - 1].end = time.ticks()
 	}
 	freq := midi2freq(note)
 	app.audio.pause(freq)
@@ -71,7 +72,7 @@ fn main() {
 		// println('Opened port $num successfully\n')
 	}
 
-	app.audio = audio.new_context(wave_kind: .triangle)
+	app.audio = audio.new_context(wave_kind: .sine)
 
 	app.gg = gg.new_context(
 		bg_color: bg_color
@@ -83,7 +84,7 @@ fn main() {
 		frame_fn: frame
 		event_fn: event
 		user_data: app
-		sample_count: 2
+		sample_count: 4
 	)
 	app.gg.run()
 }
