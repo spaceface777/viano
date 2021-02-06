@@ -49,10 +49,18 @@ fn frame(app &App) {
 	app.gg.end()
 }
 
+// how quickly the note bars will leave the screen
+const leave_factor = 100
+
+// NOTE: there is a "bug" here, which is that once a note has been released,
+// it moves up quicker than the leave_factor. This was not the intended behavior 
+// originally, but it looked nice to me, and I haven't bothered fixing it :))
+
+
 fn (app &App) draw() {
 	ww, wh := app.win_width, app.win_height
 	kw, kh := app.key_width, app.key_height
-	// 5px margin at the bottom
+	// 5px margin at the bottom, for pressed notes to take up
 	starty := wh - kh - 5
 	bar_area_height := wh - kh - 10
 
@@ -77,7 +85,7 @@ fn (app &App) draw() {
 			end := if press.end == 0 { t } else { press.end }
 			offset := f32(t - end)
 			len := f32(end - press.start)
-			len_px := (100 * len) / bar_area_height
+			len_px := (leave_factor * len) / bar_area_height
 			bcolor := note_color(midi, press.velocity)
 			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(kw), len_px, bcolor)
 		}
@@ -103,7 +111,7 @@ fn (app &App) draw() {
 			end := if press.end == 0 { t } else { press.end }
 			offset := f32(t - end)
 			len := f32(end - press.start)
-			len_px := (100 * len) / bar_area_height
+			len_px := (leave_factor * len) / bar_area_height
 			bcolor := note_color(midi, press.velocity)
 			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(bkw), len_px, bcolor)
 		}
