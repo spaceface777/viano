@@ -14,6 +14,6 @@ fn clamp<T>(x T, min T, max T) T {
 }
 
 [inline]
-fn sign<T>(x T) byte {
+fn sign<T>(x T) i8 {
 	if x < 0 { return -1 } else { return 1 }
 }

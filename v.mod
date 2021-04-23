@@ -1,6 +1,6 @@
 Module {
-	name: 'v_rtmidi'
-	description: 'RTMidi bindings for V'
-	version: '0.0.1'
-	dependencies: []
+	name: 'viano'
+	description: 'V piano app'
+	version: '0.2.0'
+	dependencies: ['vmulti.audio', 'vmulti.vidi']
 }

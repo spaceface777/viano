@@ -1,4 +1,5 @@
 import gg
+import os
 import time
 
 import audio
@@ -9,70 +10,83 @@ mut:
 	gg              &gg.Context = voidptr(0)
 	vidi            &vidi.Context = voidptr(0)
 	audio           &audio.Context = voidptr(0)
-	sustained_notes []byte
-	is_sustain      bool
+	sustained       bool
 	win_width       int
 	win_height      int
 	key_width       f32
 	key_height      f32
 	white_key_count int
-	keys            map[byte]Key
+	keys            [128]Key
 	start_note      byte = 36
 	dragging        bool
 }
 
-[inline]
-fn (mut app App) play_note(note byte, vol_ byte) {
-	app.keys[note].pressed = true
-	app.keys[note].presses << { start: time.ticks(), velocity: vol_ }
-	freq := midi2freq(note)
-
-	// // make the bass notes louder
-	// vol := f32(vol_ + 20 * (128 - note)) / 127 / 8 // + (128 - note) 
-	vol := f32(vol_) / 127 / damp_ratio
-	app.audio.play(freq, vol)
+enum KeyColor {
+	black
+	white
 }
 
-[inline]
-fn (mut app App) pause_note(note byte) {
-	if !app.keys[note].pressed { return }
-	app.keys[note].pressed = false
-	if app.keys[note].presses.len > 0 {
-		mut t := app.keys[note].presses
-		t[t.len - 1].end = time.ticks()
+struct Keypress {
+mut:
+	start    i64
+	end      i64
+	velocity byte
+}
+
+struct Key {
+mut:
+	sustained   bool
+	pressed     bool
+	presses     []Keypress
+}
+
+fn (mut app App) play_note(note byte, vol_ byte) {
+	if app.keys[note].pressed { return }
+
+	// if a note is being sustained, but it is pressed and released, pause and play it again
+	if app.sustained && app.keys[note].sustained && app.keys[note].presses.len > 0 {
+		t := time.ticks()
+		app.keys[note].presses[app.keys[note].presses.len - 1].end = t
+		app.keys[note].presses << { start: t, velocity: vol_ }
+	} else {
+		app.keys[note].pressed = true
+		app.keys[note].sustained = app.sustained
+		app.keys[note].presses << { start: time.ticks(), velocity: vol_ }
 	}
-	freq := midi2freq(note)
-	app.audio.pause(freq)
+
+	vol := f32(vol_) / 127
+	app.audio.play(note, vol)
+}
+
+fn (mut app App) pause_note(note byte) {
+	mut key := &app.keys[note]
+
+	if app.sustained {
+		key.pressed = false
+		key.sustained = true
+	} else {
+		if key.sustained && key.pressed {
+			key.sustained = false
+		} else {
+			key.sustained = false
+			key.pressed = false
+			if key.presses.len > 0 && key.presses[key.presses.len - 1].end == 0 {
+				key.presses[key.presses.len - 1].end = time.ticks()
+			}
+			app.audio.pause(note)
+		}
+	}
 }
 
 [console]
 fn main() {
 	mut app := &App{}
-
-	app.vidi = vidi.new_ctx(callback: parse_midi_event, user_data: app) ?
-    port_count := vidi.port_count()
-    println('There are $port_count ports')
-    if port_count == 0 { exit(1) }
-
-	for i in 0 .. port_count {
-		info := vidi.port_info(i)
-		println(' $i: $info.manufacturer $info.name $info.model')
+	// initialize arrays
+	for mut key in app.keys {
+		key.presses = []
 	}
 
-	if port_count == 1 {
-		app.vidi.open(0) ?
-		println('\nOpened port 0, since it was the only available port\n')
-	} else {
-		for i in 0 .. port_count {
-			if _ := app.vidi.open(i) { break } // or {}
-			else {}
-		}
-		// num := os.input('\nEnter port number: ').int()
-		// app.vidi.open(num) ?
-		// println('Opened port $num successfully\n')
-	}
-
-	app.audio = audio.new_context(wave_kind: .sine)
+	app.audio = audio.new_context(wave_kind: .torgan)
 
 	app.gg = gg.new_context(
 		bg_color: bg_color
@@ -84,7 +98,18 @@ fn main() {
 		frame_fn: frame
 		event_fn: event
 		user_data: app
-		sample_count: 4
+		font_path: gg.system_font_path()
+		// sample_count: 4
 	)
+
+	if os.args.len > 1 {
+		app.play_midi_file(os.args[1])  or {
+			eprintln('failed to parse midi file `${os.args[1]}`: $err')
+			return
+		}
+	} else {
+		app.open_midi_port() ?
+	}
+
 	app.gg.run()
 }
