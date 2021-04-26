@@ -59,7 +59,7 @@ fn (mut app App) play_note(note byte, vol_ byte) {
 }
 
 fn (mut app App) pause_note(note byte) {
-	mut key := &app.keys[note]
+	mut key := unsafe { &app.keys[note] }
 
 	if app.sustained {
 		key.pressed = false
