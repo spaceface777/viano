@@ -9,6 +9,8 @@ const (
 
 const (
 	default_key_width = 60
+	min_key_height    = 128
+	max_key_height    = 2./3
 )
 
 const (
@@ -31,12 +33,9 @@ fn frame(app &App) {
 	app.gg.end()
 }
 
-// how quickly the note bars will leave the screen
-const leave_factor = 100
+// how long a note will fall for before being played
+const lookahead = u64(3 * time.second)
 
-// NOTE: there is a "bug" here, which is that once a note has been released,
-// it moves up quicker than the leave_factor. This was not the intended behavior 
-// originally, but it looked nice to me, and I haven't bothered fixing it :))
 fn (app &App) draw() {
 	ww, wh := app.win_width, app.win_height
 	kw, kh := app.key_width, app.key_height
@@ -44,13 +43,46 @@ fn (app &App) draw() {
 	starty := wh - kh - 5
 	bar_area_height := wh - kh - 10
 
-	t := time.ticks()
-
 	// draw red strip above keyboard
 	app.gg.draw_rect(0, starty - 5, ww, 5, red_strip_color)
 
+
+	// whites := app.notes[app.i..].filter(octave[it.midi % octave.len] == .white)
+	// blacks := app.notes[app.i..].filter(octave[it.midi % octave.len] == .black)
+
+	// println('$app.i $whites.len + $blacks.len = ${app.notes[app.i..].len}')
+
+	// draw the note bars
+	mut i := u32(0)
+	mut lol := 0
+	for i = app.i; i < app.notes.len ; i++ {
+		lol++
+		note := app.notes[i]
+		if note.start > app.t { break }
+		h := f32((note.len) * u64(bar_area_height) / lookahead)
+		y := f32((app.t - note.start) * u64(bar_area_height) / lookahead)
+		x, w := app.note_pos(note.midi)
+		app.gg.draw_rect(x, y - h, w, h, note_color(note.midi, 100))
+
+
+		c := text_cfg(note.midi)
+		app.gg.draw_text(int(x + w / 2), int(y - 20), note_names[note.midi % octave.len], { ...c, color: gx.white })
+
+
+		// if y > wh { break }
+		// println('$i: $y: ${wh - int(y)}')
+
+		// println(f64(note.start+note.len-app.t) / f64(lookahead))
+
+		// height := max(int(f64(note.len) / f64(lookahead) * wh), bar_area_height - f32(y))
+		// color := note_color(note.midi, 100)
+		// app.gg.draw_rect(note.midi * 10, f32(y), 10, height, color)
+		// println('(${note.midi * 10}, $y), (10, $height)')
+	}
+	// println('$app.i -> $i')
+	i = 0
+
 	// draw white keys
-	mut i := 0
 	for midi := byte(app.start_note); i < app.white_key_count; midi++ {
 		if octave[midi % octave.len] == .black { midi++ }
 		startx := i * kw
@@ -59,27 +91,17 @@ fn (app &App) draw() {
 		pressed := key.pressed || key.sustained
 		color := if pressed { pressed_white_key_color } else { white_key_color }
 		height := if pressed { kh + 5 } else { kh }
-		app.gg.draw_rounded_rect(startx, starty, kw / 2, height / 2, f32(kw) / 6, color)
-		app.gg.draw_empty_rounded_rect(startx, starty, kw / 2, height / 2, f32(kw) / 6, gx.black)
+		app.gg.draw_rounded_rect(startx, starty, kw, height, f32(kw) / 6, color)
+		app.gg.draw_empty_rounded_rect(startx, starty, kw, height, f32(kw) / 6, gx.black)
 		app.gg.draw_text(int(startx + kw / 2), wh - 30, note_names[midi % octave.len], text_cfg(midi))
-
-		// draw note bars
-		for press in key.presses {
-			end := if press.end == 0 { t } else { press.end }
-			offset := f32(t - end)
-			len := f32(end - press.start)
-			len_px := (leave_factor * len) / bar_area_height
-			bcolor := note_color(midi, press.velocity)
-			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(kw), len_px, bcolor)
-		}
 		i++
 	}
+	i = 0
 
-	// black key width / black key height
+	// calculate the black key width / black key height: 2/3 that of a white key
 	bkw, bkh := app.key_width * 2 / 3, app.key_height * 2 / 3
 
 	// draw black keys on top
-	i = 0
 	for midi := byte(app.start_note); i < app.white_key_count - 1; midi++ {
 		x := octave[(midi + 1) % octave.len]
 		if x == .white { i++ continue } else { midi++ }
@@ -91,17 +113,17 @@ fn (app &App) draw() {
 		height := if pressed { bkh + 3 } else { bkh }
 		app.gg.draw_rect(startx, starty, bkw, height, color)
 		app.gg.draw_text(int(startx + kw / 3), int(wh - app.key_height / 3 - 20), note_names[midi % octave.len], text_cfg(midi))
-
-		// draw note bars
-		for press in key.presses {
-			end := if press.end == 0 { t } else { press.end }
-			offset := f32(t - end)
-			len := f32(end - press.start)
-			len_px := (leave_factor * len) / bar_area_height
-			bcolor := note_color(midi, press.velocity)
-			app.gg.draw_rect(startx, bar_area_height - len_px - offset, f32(bkw), len_px, bcolor)
-		}
 		i++
+	}
+}
+
+// note_pos returns the x coordinate of a note bar and its width
+// TODO
+fn (app &App) note_pos(note byte) (f32, f32) {
+	if octave[note % octave.len] == .white {
+		return f32(note - app.start_note) * app.win_width / app.white_key_count / 1.75, app.key_width
+	} else {
+		return f32(note - app.start_note) * app.win_width / app.white_key_count / 1.75 + 1/2, app.key_width * 2 / 3
 	}
 }
 
@@ -119,7 +141,16 @@ fn text_cfg(note byte) gx.TextCfg {
 
 [inline]
 fn note_color(note byte, vol byte) gx.Color {
-	return note_colors[note % octave.len]
+	mut c := note_colors[note % octave.len]
+	if !is_playable(note) {
+		// these are outside the playable Boomwhackers range - make them dark
+		c = gx.Color{
+			r: c.r / 3
+			g: c.g / 3
+			b: c.b / 3
+		}
+	}
+	return c
 }
 
 fn event(e &gg.Event, mut app App) {
@@ -131,7 +162,20 @@ fn event(e &gg.Event, mut app App) {
 			app.resize()
 		}
 		.mouse_scroll {
-
+			if e.scroll_x < 0 {
+				app.shift_kb(.left)
+			} else if e.scroll_x > 0 {
+				app.shift_kb(.right)
+			}
+			if e.scroll_y < 0 {
+				if app.key_height < f64(app.win_height) * max_key_height {
+					app.key_height += 3
+				}
+			} else {
+				if app.key_height > 128 {
+					app.key_height -= 3
+				}
+			}
 		}
 		.mouse_down {
 			if e.mouse_y < app.win_height - app.key_height { return }
@@ -167,7 +211,6 @@ fn event(e &gg.Event, mut app App) {
 			if app.dragging {
 				s := sign(e.mouse_dx)
 				if s == -1 { return } // TODO: fix
-				println(s)
 
 				mut note, mut i := i8(app.start_note), 0
 				for {
@@ -191,7 +234,6 @@ fn event(e &gg.Event, mut app App) {
 				if octave[note % octave.len] == .black { prev_note -= s }
 
 				if note != prev_note {
-					println('$prev_note -> $note')
 					app.pause_note(byte(prev_note))
 					app.play_note(byte(note), 100)
 				}
@@ -203,22 +245,14 @@ fn event(e &gg.Event, mut app App) {
 					exit(0)
 				}
 				.left {
-					for {
-						app.start_note++
-						if octave[app.start_note % octave.len] == .white { break }
-					}
-					app.check_bounds()
+					app.shift_kb(.left)
 				}
 				.right {
-					for {
-						app.start_note--
-						if octave[app.start_note % octave.len] == .white { break }
-					}
-					app.check_bounds()
+					app.shift_kb(.right)
 				}
-				.space {
-					if app.sustained { app.unsustain() } else { app.sustain() }
-				}
+				// .space {
+				// 	if app.sustained { app.unsustain() } else { app.sustain() }
+				// }
 				else {}
 			}
 		}
@@ -226,15 +260,32 @@ fn event(e &gg.Event, mut app App) {
 	}
 }
 
-fn (mut app App) resize() {
-	s := gg.window_size()
-	app.win_width, app.win_height = s.width, s.height
+enum Direction {
+	left = -1
+	right = 1
+}
 
-	app.key_height = clamp(app.win_height / 4, 150, 400)
+fn (mut app App) shift_kb(d Direction) {
+	for {
+		app.start_note -= byte(d)
+		if octave[app.start_note % octave.len] == .white { break }
+	}
+	app.check_bounds()
+}
+
+fn (mut app App) resize() {
+	// save previous values to keep proportional scaling
+	_, ph := app.win_width, app.win_height
+
+	s := gg.window_size()
+	ww, wh := s.width, s.height
+	app.win_width, app.win_height = ww, wh
+
+	app.key_height = clamp(app.key_height / ph * wh, min_key_height, f32(wh) * max_key_height)
 
 	// calculate ideal key count/width based on the current window width
-	app.white_key_count = int(f32(app.win_width) / default_key_width + 0.5) // round
-	app.key_width = f32(app.win_width) / app.white_key_count // will be 45 ± some decimal
+	app.white_key_count = int(f32(ww) / default_key_width + 0.5) // round
+	app.key_width = f32(ww) / app.white_key_count // will be 45 ± some decimal
 
 	if app.start_note + app.white_key_count >= 127 {
 		app.start_note = byte(128 - app.white_key_count)
@@ -254,13 +305,10 @@ fn (mut app App) check_bounds() {
 	}
 	if midi <= 128 { return }
 
-	dump('YES')
-
 	for midi > 127 {
 		if octave[midi % octave.len] == .black { midi -= 2 } else { midi-- }
 		app.start_note--
 	}
-	dump(app.start_note)
 
 	// ensure the window layout is now valid
 	app.check_bounds()

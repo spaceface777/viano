@@ -11,14 +11,39 @@ mut:
 	vidi            &vidi.Context = voidptr(0)
 	audio           &audio.Context = voidptr(0)
 	sustained       bool
-	win_width       int
-	win_height      int
-	key_width       f32
-	key_height      f32
+	win_width       int = 1280
+	win_height      int = 800
+	key_width       f32 = 60
+	key_height      f32 = 200
 	white_key_count int
 	keys            [128]Key
 	start_note      byte = 36
 	dragging        bool
+
+	// info about the current song:
+	// the notes that make it up
+	notes []Note
+	// the current timestamp (in ns)
+	t     u64
+	// the index of the first note currently being played in the song
+	i     u32
+	// the current song's length in ns
+	song_len u64
+}
+
+struct Note {
+mut:
+	start u64
+	len   u32
+	midi  byte
+	vel   byte
+}
+
+fn (n Note) str() string {
+	a := int(n.midi)
+	b := f64(n.start)  / time.second
+	c := f64(n.start+n.len) / time.second
+	return '\n  [$a] $b - $c'
 }
 
 enum KeyColor {
@@ -26,65 +51,35 @@ enum KeyColor {
 	white
 }
 
-struct Keypress {
-mut:
-	start    i64
-	end      i64
-	velocity byte
-}
-
 struct Key {
 mut:
-	sustained   bool
-	pressed     bool
-	presses     []Keypress
+	sidx      u32
+	sustained bool
+	pressed   bool
+}
+
+// byte.is_playable returns true if a note is playable using a Boomwhackers set
+[inline]
+fn is_playable(n byte) bool {
+	return n >= 48 && n <= 76
 }
 
 fn (mut app App) play_note(note byte, vol_ byte) {
 	if app.keys[note].pressed { return }
 
-	// if a note is being sustained, but it is pressed and released, pause and play it again
-	if app.sustained && app.keys[note].sustained && app.keys[note].presses.len > 0 {
-		t := time.ticks()
-		app.keys[note].presses[app.keys[note].presses.len - 1].end = t
-		app.keys[note].presses << { start: t, velocity: vol_ }
-	} else {
-		app.keys[note].pressed = true
-		app.keys[note].sustained = app.sustained
-		app.keys[note].presses << { start: time.ticks(), velocity: vol_ }
-	}
-
+	app.keys[note].pressed = true
 	vol := f32(vol_) / 127
 	app.audio.play(note, vol)
 }
 
 fn (mut app App) pause_note(note byte) {
-	mut key := unsafe { &app.keys[note] }
-
-	if app.sustained {
-		key.pressed = false
-		key.sustained = true
-	} else {
-		if key.sustained && key.pressed {
-			key.sustained = false
-		} else {
-			key.sustained = false
-			key.pressed = false
-			if key.presses.len > 0 && key.presses[key.presses.len - 1].end == 0 {
-				key.presses[key.presses.len - 1].end = time.ticks()
-			}
-			app.audio.pause(note)
-		}
-	}
+	app.keys[note].pressed = false
+	app.audio.pause(note)
 }
 
 [console]
 fn main() {
 	mut app := &App{}
-	// initialize arrays
-	for mut key in app.keys {
-		key.presses = []
-	}
 
 	app.audio = audio.new_context(wave_kind: .torgan)
 
@@ -99,16 +94,43 @@ fn main() {
 		event_fn: event
 		user_data: app
 		font_path: gg.system_font_path()
-		// sample_count: 4
+		sample_count: 4
 	)
 
 	if os.args.len > 1 {
-		app.play_midi_file(os.args[1])  or {
+		app.parse_midi_file(os.args[1])  or {
 			eprintln('failed to parse midi file `${os.args[1]}`: $err')
 			return
 		}
+
+		mut song_len := u64(0)
+		mut notes_needed := map[byte]u16{}
+		for note in app.notes {
+			if note.start + note.len > song_len {
+				song_len = note.start + note.len
+			}
+			notes_needed[note.midi]++
+		}
+		app.song_len = song_len
+		println('song length: ${f64(song_len) / 6e+10:.1f} minutes')
+
+		notes_per_second := f64(app.notes.len) / f64(app.song_len) * f64(time.second)
+		difficulties := ['easy', 'medium', 'hard', 'extreme']!
+		println('total notes: $app.notes.len (${notes_per_second:.1f} notes/sec, difficulty: ${difficulties[clamp<byte>(byte(notes_per_second / 3.3), 0, 3)]})')
+
+		mut keys := notes_needed.keys()
+		keys.sort()
+
+		println('required notes:')
+		for k in keys {
+			v := notes_needed[k]
+			println(' ${midi2name(k):-20}$v')
+		}
+
+		go app.play()
 	} else {
-		app.open_midi_port() ?
+		eprintln('usage: viano <file.mid>')
+		exit(1)
 	}
 
 	app.gg.run()
