@@ -1,11 +1,12 @@
 # viano
-MIDI piano V app, including dedicated midi input and audio modules. Supports generating sound waves (sine/triangle/sawtooth/square), and automatic loading and repitching (soon) of audio samples
+MIDI piano V app. Visualizes and plays a MIDI file (similarly to Synthesia).
 
+https://user-images.githubusercontent.com/12110214/118543500-9d5a2a80-b754-11eb-8cc3-e45e60d6f3aa.mp4
 
 ### Usage
 
-`v -cc tcc -cg run src/` for compiling/running a debug binary;  
-`v -prod -compress -o vmidi src/` for compiling a production binary
+`v -cg run .` for compiling/running a debug binary;  
+`v -prod -skip-unused -compress -o vmidi .` for compiling a production binary
 
 ### External Dependencies
 
