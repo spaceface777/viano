@@ -17,9 +17,12 @@ mut:
 	key_height      f32 = 200
 	white_key_count int
 	keys            [128]Key
-	start_note      byte = 36
-	dragging        bool
+	start_note      byte = 41
 
+	// whether the current song is paused
+	paused bool
+	// the current tempo multiplier
+	tempo  f32 = 1.0
 	// info about the current song:
 	// the notes that make it up
 	notes []Note
@@ -56,25 +59,6 @@ mut:
 	sidx      u32
 	sustained bool
 	pressed   bool
-}
-
-// byte.is_playable returns true if a note is playable using a Boomwhackers set
-[inline]
-fn is_playable(n byte) bool {
-	return n >= 48 && n <= 76
-}
-
-fn (mut app App) play_note(note byte, vol_ byte) {
-	if app.keys[note].pressed { return }
-
-	app.keys[note].pressed = true
-	vol := f32(vol_) / 127
-	app.audio.play(note, vol)
-}
-
-fn (mut app App) pause_note(note byte) {
-	app.keys[note].pressed = false
-	app.audio.pause(note)
 }
 
 [console]
@@ -115,8 +99,8 @@ fn main() {
 		println('song length: ${f64(song_len) / 6e+10:.1f} minutes')
 
 		notes_per_second := f64(app.notes.len) / f64(app.song_len) * f64(time.second)
-		difficulties := ['easy', 'medium', 'hard', 'extreme']!
-		println('total notes: $app.notes.len (${notes_per_second:.1f} notes/sec, difficulty: ${difficulties[clamp<byte>(byte(notes_per_second / 3.3), 0, 3)]})')
+		difficulties := ['easy', 'medium', 'hard', 'very hard', 'extreme']!
+		println('total notes: $app.notes.len (${notes_per_second:.1f} notes/sec, difficulty: ${difficulties[clamp<byte>(byte(notes_per_second / 3.3), 0, 4)]})')
 
 		mut keys := notes_needed.keys()
 		keys.sort()

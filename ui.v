@@ -3,12 +3,12 @@ import gx
 import time
 
 const (
-	win_width  = 1260
+	win_width  = 1320
 	win_height = 800
 )
 
 const (
-	default_key_width = 60
+	default_key_width = 56
 	min_key_height    = 128
 	max_key_height    = 2./3
 )
@@ -34,52 +34,34 @@ fn frame(app &App) {
 }
 
 // how long a note will fall for before being played
-const lookahead = u64(3 * time.second)
+const lookahead = u64(2 * time.second)
 
 fn (app &App) draw() {
 	ww, wh := app.win_width, app.win_height
 	kw, kh := app.key_width, app.key_height
-	// 5px margin at the bottom, for pressed notes to take up
+	// allow for a 5px margin at the bottom
 	starty := wh - kh - 5
 	bar_area_height := wh - kh - 10
 
-	// draw red strip above keyboard
+	// draw red "felt" strip above keyboard
 	app.gg.draw_rect(0, starty - 5, ww, 5, red_strip_color)
-
-
-	// whites := app.notes[app.i..].filter(octave[it.midi % octave.len] == .white)
-	// blacks := app.notes[app.i..].filter(octave[it.midi % octave.len] == .black)
-
-	// println('$app.i $whites.len + $blacks.len = ${app.notes[app.i..].len}')
 
 	// draw the note bars
 	mut i := u32(0)
-	mut lol := 0
 	for i = app.i; i < app.notes.len ; i++ {
-		lol++
 		note := app.notes[i]
 		if note.start > app.t { break }
 		h := f32((note.len) * u64(bar_area_height) / lookahead)
 		y := f32((app.t - note.start) * u64(bar_area_height) / lookahead)
 		x, w := app.note_pos(note.midi)
-		app.gg.draw_rect(x, y - h, w, h, note_color(note.midi, 100))
-
+		color := note_color(note.midi, 100)
+		app.gg.draw_rounded_rect(x, y - h, w, h, f32(w) / 6, color)
+		// draw a thin strip below each note in order to be able to make apart quick presses
+		app.gg.draw_rect(x, y-7, w, 7, lighten(color, 0.67))
 
 		c := text_cfg(note.midi)
-		app.gg.draw_text(int(x + w / 2), int(y - 20), note_names[note.midi % octave.len], { ...c, color: gx.white })
-
-
-		// if y > wh { break }
-		// println('$i: $y: ${wh - int(y)}')
-
-		// println(f64(note.start+note.len-app.t) / f64(lookahead))
-
-		// height := max(int(f64(note.len) / f64(lookahead) * wh), bar_area_height - f32(y))
-		// color := note_color(note.midi, 100)
-		// app.gg.draw_rect(note.midi * 10, f32(y), 10, height, color)
-		// println('(${note.midi * 10}, $y), (10, $height)')
+		app.gg.draw_text(int(x + w / 2), int(y - 12), note_names[note.midi % octave.len], { ...c, color: gx.black, size: 20 })
 	}
-	// println('$app.i -> $i')
 	i = 0
 
 	// draw white keys
@@ -141,101 +123,40 @@ fn text_cfg(note byte) gx.TextCfg {
 
 [inline]
 fn note_color(note byte, vol byte) gx.Color {
-	mut c := note_colors[note % octave.len]
-	if !is_playable(note) {
-		// these are outside the playable Boomwhackers range - make them dark
-		c = gx.Color{
-			r: c.r / 3
-			g: c.g / 3
-			b: c.b / 3
+	c := note_colors[note % octave.len]
+	$if !unplayable ? {
+		if !is_playable(note) {
+			// these are outside the playable Boomwhackers range - darken them
+			return lighten(c, 0.33)
 		}
 	}
 	return c
 }
 
+// lighten lightens `color` by a rate of `amount`. An `amount` < 0 means that `color` is darkened instead.
+[inline]
+fn lighten(color gx.Color, amount f32) gx.Color {
+	return {
+		r: byte(color.r * amount)
+		g: byte(color.g * amount)
+		b: byte(color.b * amount)
+	}
+}
+
+// event is the callback that is called after a window event occurs
 fn event(e &gg.Event, mut app App) {
 	match e.typ {
-		// .key_down {
-		// 	app.on_key_down(e.key_code)
-		// }
 		.resized, .restored, .resumed {
 			app.resize()
 		}
 		.mouse_scroll {
-			if e.scroll_x < 0 {
-				app.shift_kb(.left)
-			} else if e.scroll_x > 0 {
-				app.shift_kb(.right)
-			}
 			if e.scroll_y < 0 {
 				if app.key_height < f64(app.win_height) * max_key_height {
 					app.key_height += 3
 				}
-			} else {
+			} else if e.scroll_y > 0 {
 				if app.key_height > 128 {
 					app.key_height -= 3
-				}
-			}
-		}
-		.mouse_down {
-			if e.mouse_y < app.win_height - app.key_height { return }
-			if e.mouse_button == .left {
-				app.dragging = true
-				mut note, mut i := app.start_note, 0
-				for {
-					i++
-					note++
-					if i * app.key_width > e.mouse_x { break }
-					if octave[note % octave.len] == .black { note++ } // else { note++ }
-				}
-				note--
-				app.play_note(note, 100)
-			}
-		}
-		.mouse_up {
-			if e.mouse_y < app.win_height - app.key_height { return }
-			if e.mouse_button == .left {
-				app.dragging = false
-				mut note, mut i := app.start_note, 0
-				for {
-					i++
-					note++
-					if i * app.key_width > e.mouse_x { break }
-					if octave[note % octave.len] == .black { note++ } // else { note++ }
-				}
-				note--
-				app.pause_note(note)
-			}
-		}
-		.mouse_move {
-			if app.dragging {
-				s := sign(e.mouse_dx)
-				if s == -1 { return } // TODO: fix
-
-				mut note, mut i := i8(app.start_note), 0
-				for {
-					i++
-					note++
-					if i * app.key_width > e.mouse_x { break }
-					if octave[note % octave.len] == .black { note++ }
-				}
-				note--
-				// if octave[note % octave.len] == .black { note -- }
-
-				mut prev_note := note - 2 * s
-				i -= 2 * s
-				for {
-					i += s
-					prev_note++
-					if i * app.key_width > (e.mouse_x - e.mouse_dx) { break }
-					if octave[prev_note % octave.len] == .black { prev_note ++ }
-				}
-				prev_note -= s
-				if octave[note % octave.len] == .black { prev_note -= s }
-
-				if note != prev_note {
-					app.pause_note(byte(prev_note))
-					app.play_note(byte(note), 100)
 				}
 			}
 		}
@@ -244,33 +165,49 @@ fn event(e &gg.Event, mut app App) {
 				.escape {
 					exit(0)
 				}
+				// .left {
+				// 	app.shift_kb(.left)
+				// }
+				// .right {
+				// 	app.shift_kb(.right)
+				// }
 				.left {
-					app.shift_kb(.left)
+					if app.t < time.second {
+						app.t = 0
+					} else {
+						if app.t > u64(time.second) {
+							app.t -= u64(time.second)
+						} else {
+							app.t = 0
+						}
+					}
+					// TODO
+					if app.i > 10 {
+						app.i -= 10
+					} else {
+						app.i = 0
+					}
+					app.pause_all()
 				}
 				.right {
-					app.shift_kb(.right)
+					app.t += u64(time.second)
 				}
-				// .space {
-				// 	if app.sustained { app.unsustain() } else { app.sustain() }
-				// }
-				else {}
+				.up {
+					app.tempo += 0.03
+				}
+				.down {
+					app.tempo -= 0.03
+				}
+				.space {
+					app.paused = !app.paused
+				}
+				else {
+					println(e.key_code)
+				}
 			}
 		}
 		else {}
 	}
-}
-
-enum Direction {
-	left = -1
-	right = 1
-}
-
-fn (mut app App) shift_kb(d Direction) {
-	for {
-		app.start_note -= byte(d)
-		if octave[app.start_note % octave.len] == .white { break }
-	}
-	app.check_bounds()
 }
 
 fn (mut app App) resize() {
@@ -295,7 +232,7 @@ fn (mut app App) resize() {
 
 fn (mut app App) check_bounds() {
 	if app.start_note > 128 {
-		// overflow
+		// an overflow ocurred somewhere
 		app.start_note = 0
 	}
 

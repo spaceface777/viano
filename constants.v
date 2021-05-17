@@ -36,7 +36,7 @@ const note_colors = [
 	gx.Color{ r: 236, g: 137, b: 10,  a: 255 }
 	gx.Color{ r: 252, g: 205, b: 16,  a: 255 }
 	gx.Color{ r: 247, g: 232, b: 20,  a: 255 }
-	gx.Color{ r: 215, g: 214, b: 1,   a: 255 }
+	gx.Color{ r: 190, g: 214, b: 1,   a: 255 }
 	gx.Color{ r: 134, g: 185, b: 20,  a: 255 }
 	gx.Color{ r: 100, g: 178, b: 83,  a: 255 }
 	gx.Color{ r: 70,  g: 130, b: 190, a: 255 }

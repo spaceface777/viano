@@ -5,9 +5,40 @@ import vidi
 [inline]
 fn midi2name(midi byte) string {
 	x := ['bass', 'mid', 'high']!
-	oct := if is_playable(midi) { x[midi/12 - 4] } else { '(unplayable)' }
+	oct := if is_playable(midi) { x[clamp(midi/12 - 4, 0, x.len-1)] } else { '(unplayable)' }
 	note := note_names[midi%12]
 	return '$oct $note'
+}
+
+// byte.is_playable returns true if a note is playable using a Boomwhackers set
+[inline]
+fn is_playable(n byte) bool {
+	return n >= 48 && n <= 76
+}
+
+[inline]
+fn (mut app App) play_note(note byte, vol_ byte) {
+	if app.keys[note].pressed { return }
+
+	app.keys[note].pressed = true
+	vol := f32(vol_) / 127
+	app.audio.play(note, vol)
+}
+
+[inline]
+fn (mut app App) pause_note(note byte) {
+	app.keys[note].pressed = false
+	app.audio.pause(note)
+}
+
+[inline]
+fn (mut app App) pause_all() {
+	for note, mut key in app.keys {
+		if key.pressed {
+			key.pressed = false
+			app.audio.pause(byte(note))
+		}
+	}
 }
 
 fn (mut app App) note_down(note byte, velocity byte) {
@@ -47,6 +78,7 @@ fn (mut app App) parse_midi_file(name string) ? {
 	_ = is_sustain
 	mut t := u64(0)
 	for track in midi.tracks {
+		mpqn = u32(midi.micros_per_tick)
 		for event in track.data {
 			t += event.delta_time * mpqn * u64(time.microsecond)
 			match event {
@@ -103,12 +135,16 @@ fn (mut app App) parse_midi_file(name string) ? {
 }
 
 fn (mut app App) play() {
-	start_time := time.sys_mono_now()
-	for app.t < app.song_len {
-		app.t = (time.sys_mono_now() - start_time)
-		time.sleep(5*time.microsecond)
+	mut sw := time.new_stopwatch({})
+	for app.t < app.song_len + lookahead + u64(time.second) {
+		time.sleep(50*time.microsecond)
+		if app.paused {
+			sw.restart()
+			continue
+		}
+		app.t += u64(f64(sw.elapsed()) * app.tempo)
+		sw.restart()
 		mut is_at_start := true
-		_ = is_at_start
 		for i := app.i; i < app.notes.len ; i++ {
 			note := app.notes[i]
 			key := app.keys[note.midi]
@@ -124,6 +160,10 @@ fn (mut app App) play() {
 				}
 			}
 			
+			$if !unplayable ? {
+				if !is_playable(note.midi) { continue }
+			}
+
 			if note.start <= lt && end > lt && !key.pressed {
 				app.play_note(note.midi, note.vel)
 				app.keys[note.midi].sidx = i
@@ -135,5 +175,5 @@ fn (mut app App) play() {
 			if note.start > lt { break }
 		}
 	}
-	exit(1)
+	// exit(0)
 }
