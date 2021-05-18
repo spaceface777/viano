@@ -10,5 +10,9 @@ https://user-images.githubusercontent.com/12110214/118543500-9d5a2a80-b754-11eb-
 
 ### External Dependencies
 
-None - all libraries used are written in V, and only have the standard dependencies required by the V standard library modules :)
-Previous versions depended on rtmidi, but viano now uses [vidi](https://github.com/vmulti/vidi), a pure-V realtime midi library.
+This module does not depend on any C libraries outside of those needed by the V standard library.
+This means that on some linux distros, you may need to install the `alsa` development package
+
+Debian/Ubuntu: `sudo apt install libasound2-dev libxi-dev libxcursor-dev`
+
+If you've ever used V's graphical modules (for example, ran one of the graphical examples such as tetris or 2048) or V UI, you most likely already have these dependencies installed.
