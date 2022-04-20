@@ -1,24 +1,25 @@
 import time
-
 import vidi
 
 [inline]
-fn midi2name(midi byte) string {
+fn midi2name(midi u8) string {
 	x := ['bass', 'mid', 'high']!
-	oct := if is_playable(midi) { x[clamp(midi/12 - 4, 0, x.len-1)] } else { '(unplayable)' }
-	note := note_names[midi%12]
+	oct := if is_playable(midi) { x[clamp(midi / 12 - 4, 0, x.len - 1)] } else { '(unplayable)' }
+	note := note_names[midi % 12]
 	return '$oct $note'
 }
 
-// byte.is_playable returns true if a note is playable using a Boomwhackers set
+// u8.is_playable returns true if a note is playable using a Boomwhackers set
 [inline]
-fn is_playable(n byte) bool {
+fn is_playable(n u8) bool {
 	return n >= 48 && n <= 76
 }
 
 [inline]
-fn (mut app App) play_note(note byte, vol_ byte) {
-	if app.keys[note].pressed { return }
+fn (mut app App) play_note(note u8, vol_ u8) {
+	if app.keys[note].pressed {
+		return
+	}
 
 	app.keys[note].pressed = true
 	vol := f32(vol_) / 127
@@ -26,7 +27,7 @@ fn (mut app App) play_note(note byte, vol_ byte) {
 }
 
 [inline]
-fn (mut app App) pause_note(note byte) {
+fn (mut app App) pause_note(note u8) {
 	app.keys[note].pressed = false
 	app.audio.pause(note)
 }
@@ -36,12 +37,12 @@ fn (mut app App) pause_all() {
 	for note, mut key in app.keys {
 		if key.pressed {
 			key.pressed = false
-			app.audio.pause(byte(note))
+			app.audio.pause(u8(note))
 		}
 	}
 }
 
-fn (mut app App) note_down(note byte, velocity byte) {
+fn (mut app App) note_down(note u8, velocity u8) {
 	if velocity == 0 {
 		app.pause_note(note)
 	} else {
@@ -63,7 +64,7 @@ fn (mut app App) sustain() {
 fn (mut app App) unsustain() {
 	if app.sustained {
 		app.sustained = false
-		for midi in 0 .. byte(app.keys.len) {
+		for midi in 0 .. u8(app.keys.len) {
 			app.pause_note(midi)
 		}
 	}
@@ -94,7 +95,7 @@ fn (mut app App) parse_midi_file(name string) ? {
 						cache[event.note] = Note{}
 					} else {
 						// play
-						cache[event.note] = {
+						cache[event.note] = Note{
 							start: t
 							midi: event.note
 							vel: event.velocity
@@ -102,24 +103,23 @@ fn (mut app App) parse_midi_file(name string) ? {
 					}
 				}
 				vidi.Controller {
-						match event.controller_type {
-							0x40, 0x17 {
-								if event.value > 0x40 {
-									is_sustain = true
-								} else {
-									is_sustain = false
-									for mut note in sustained_notes {
-										note.len = u32(t - note.start)
-									}
-									app.notes << sustained_notes
-									sustained_notes.clear()
+					match event.controller_type {
+						0x40, 0x17 {
+							if event.value > 0x40 {
+								is_sustain = true
+							} else {
+								is_sustain = false
+								for mut note in sustained_notes {
+									note.len = u32(t - note.start)
 								}
-							}
-							else {
-								// println('Control change (control=$control, value=$value)')
+								app.notes << sustained_notes
+								sustained_notes.clear()
 							}
 						}
-
+						else {
+							// println('Control change (control=$control, value=$value)')
+						}
+					}
 				}
 				vidi.SetTempo {
 					mpqn = u32(midi.mpqn(event.microseconds))
@@ -135,9 +135,9 @@ fn (mut app App) parse_midi_file(name string) ? {
 }
 
 fn (mut app App) play() {
-	mut sw := time.new_stopwatch({})
+	mut sw := time.new_stopwatch()
 	for app.t < app.song_len + lookahead + u64(time.second) {
-		time.sleep(50*time.microsecond)
+		time.sleep(50 * time.microsecond)
 		if app.paused {
 			sw.restart()
 			continue
@@ -145,7 +145,7 @@ fn (mut app App) play() {
 		app.t += u64(f64(sw.elapsed()) * app.tempo)
 		sw.restart()
 		mut is_at_start := true
-		for i := app.i; i < app.notes.len ; i++ {
+		for i := app.i; i < app.notes.len; i++ {
 			note := app.notes[i]
 			key := app.keys[note.midi]
 			end := note.start + note.len
@@ -159,9 +159,11 @@ fn (mut app App) play() {
 					is_at_start = false
 				}
 			}
-			
+
 			$if !unplayable ? {
-				if !is_playable(note.midi) { continue }
+				if !is_playable(note.midi) {
+					continue
+				}
 			}
 
 			if note.start <= lt && end > lt && !key.pressed {
@@ -172,8 +174,11 @@ fn (mut app App) play() {
 				app.pause_note(note.midi)
 			}
 
-			if note.start > lt { break }
+			if note.start > lt {
+				break
+			}
 		}
 	}
+
 	// exit(0)
 }

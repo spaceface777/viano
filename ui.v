@@ -1,4 +1,4 @@
-﻿import gg
+import gg
 import gx
 import time
 
@@ -10,14 +10,14 @@ const (
 const (
 	default_key_width = 56
 	min_key_height    = 128
-	max_key_height    = 2./3
+	max_key_height    = 2.0 / 3
 )
 
 const (
-	bg_color        = gx.rgb(24, 24, 24)
-	red_strip_color = gx.rgb(80, 0, 0)
-	white_key_color = gx.rgb(255, 255, 245)
-	black_key_color = gx.rgb(25, 25, 25)
+	bg_color                = gx.rgb(24, 24, 24)
+	red_strip_color         = gx.rgb(80, 0, 0)
+	white_key_color         = gx.rgb(255, 255, 245)
+	black_key_color         = gx.rgb(25, 25, 25)
 
 	pressed_white_key_color = gx.rgb(210, 210, 175)
 	pressed_black_key_color = gx.rgb(80, 80, 80)
@@ -39,43 +39,53 @@ const lookahead = u64(2 * time.second)
 fn (app &App) draw() {
 	ww, wh := app.win_width, app.win_height
 	kw, kh := app.key_width, app.key_height
+
 	// allow for a 5px margin at the bottom
 	starty := wh - kh - 5
 	bar_area_height := wh - kh - 10
 
 	// draw red "felt" strip above keyboard
-	app.gg.draw_rect(0, starty - 5, ww, 5, red_strip_color)
+	app.gg.draw_rect_filled(0, starty - 5, ww, 5, red_strip_color)
 
 	// draw the note bars
 	mut i := u32(0)
-	for i = app.i; i < app.notes.len ; i++ {
+	for i = app.i; i < app.notes.len; i++ {
 		note := app.notes[i]
-		if note.start > app.t { break }
+		if note.start > app.t {
+			break
+		}
 		h := f32((note.len) * u64(bar_area_height) / lookahead)
 		y := f32((app.t - note.start) * u64(bar_area_height) / lookahead)
 		x, w := app.note_pos(note.midi)
 		color := note_color(note.midi, 100)
-		app.gg.draw_rounded_rect(x, y - h, w, h, f32(w) / 6, color)
+		app.gg.draw_rounded_rect_filled(x, y - h, w, h, f32(w) / 6, color)
+
 		// draw a thin strip below each note in order to be able to make apart quick presses
-		app.gg.draw_rect(x, y-7, w, 7, lighten(color, 0.67))
+		app.gg.draw_rect_filled(x, y - 7, w, 7, lighten(color, 0.67))
 
 		c := text_cfg(note.midi)
-		app.gg.draw_text(int(x + w / 2), int(y - 12), note_names[note.midi % octave.len], { ...c, color: gx.black, size: 20 })
+		app.gg.draw_text(int(x + w / 2), int(y - 12), note_names[note.midi % octave.len],
+			gx.TextCfg{ ...c, color: gx.black, size: 20 })
 	}
 	i = 0
 
 	// draw white keys
-	for midi := byte(app.start_note); i < app.white_key_count; midi++ {
-		if octave[midi % octave.len] == .black { midi++ }
+	for midi := u8(app.start_note); i < app.white_key_count; midi++ {
+		if octave[midi % octave.len] == .black {
+			midi++
+		}
 		startx := i * kw
-		if midi > 127 { break }
+		if midi > 127 {
+			break
+		}
 		key := app.keys[midi]
 		pressed := key.pressed || key.sustained
 		color := if pressed { pressed_white_key_color } else { white_key_color }
 		height := if pressed { kh + 5 } else { kh }
-		app.gg.draw_rounded_rect(startx, starty, kw, height, f32(kw) / 6, color)
-		app.gg.draw_empty_rounded_rect(startx, starty, kw, height, f32(kw) / 6, gx.black)
-		app.gg.draw_text(int(startx + kw / 2), wh - 30, note_names[midi % octave.len], text_cfg(midi))
+		app.gg.draw_rounded_rect_filled(startx, starty, kw, height, f32(kw) / 6, color)
+		app.gg.draw_rounded_rect_empty(startx, starty, kw, height, f32(kw) / 6, gx.black)
+		app.gg.draw_text(int(startx + kw / 2), wh - 30, note_names[midi % octave.len],
+			text_cfg(midi))
 		i++
 	}
 	i = 0
@@ -84,35 +94,43 @@ fn (app &App) draw() {
 	bkw, bkh := app.key_width * 2 / 3, app.key_height * 2 / 3
 
 	// draw black keys on top
-	for midi := byte(app.start_note); i < app.white_key_count - 1; midi++ {
+	for midi := u8(app.start_note); i < app.white_key_count - 1; midi++ {
 		x := octave[(midi + 1) % octave.len]
-		if x == .white { i++ continue } else { midi++ }
-		if midi > 127 { break }
+		if x == .white {
+			i++
+			continue
+		} else {
+			midi++
+		}
+		if midi > 127 {
+			break
+		}
 		key := app.keys[midi]
 		startx := i * kw + bkw
 		pressed := key.pressed || key.sustained
 		color := if pressed { pressed_black_key_color } else { black_key_color }
 		height := if pressed { bkh + 3 } else { bkh }
-		app.gg.draw_rect(startx, starty, bkw, height, color)
-		app.gg.draw_text(int(startx + kw / 3), int(wh - app.key_height / 3 - 20), note_names[midi % octave.len], text_cfg(midi))
+		app.gg.draw_rect_filled(startx, starty, bkw, height, color)
+		app.gg.draw_text(int(startx + kw / 3), int(wh - app.key_height / 3 - 20), note_names[midi % octave.len],
+			text_cfg(midi))
 		i++
 	}
 }
 
 // note_pos returns the x coordinate of a note bar and its width
 // TODO
-fn (app &App) note_pos(note byte) (f32, f32) {
+fn (app &App) note_pos(note u8) (f32, f32) {
 	if octave[note % octave.len] == .white {
 		return f32(note - app.start_note) * app.win_width / app.white_key_count / 1.75, app.key_width
 	} else {
-		return f32(note - app.start_note) * app.win_width / app.white_key_count / 1.75 + 1/2, app.key_width * 2 / 3
+		return f32(note - app.start_note) * app.win_width / app.white_key_count / 1.75 + 1 / 2, app.key_width * 2 / 3
 	}
 }
 
 [inline]
-fn text_cfg(note byte) gx.TextCfg {
+fn text_cfg(note u8) gx.TextCfg {
 	size := if octave[note % octave.len] == .black { 18 } else { 32 }
-	return {
+	return gx.TextCfg{
 		color: note_colors[note % octave.len]
 		size: size
 		align: .center
@@ -122,7 +140,7 @@ fn text_cfg(note byte) gx.TextCfg {
 }
 
 [inline]
-fn note_color(note byte, vol byte) gx.Color {
+fn note_color(note u8, vol u8) gx.Color {
 	c := note_colors[note % octave.len]
 	$if !unplayable ? {
 		if !is_playable(note) {
@@ -136,10 +154,10 @@ fn note_color(note byte, vol byte) gx.Color {
 // lighten lightens `color` by a rate of `amount`. An `amount` < 0 means that `color` is darkened instead.
 [inline]
 fn lighten(color gx.Color, amount f32) gx.Color {
-	return {
-		r: byte(color.r * amount)
-		g: byte(color.g * amount)
-		b: byte(color.b * amount)
+	return gx.Color{
+		r: u8(color.r * amount)
+		g: u8(color.g * amount)
+		b: u8(color.b * amount)
 	}
 }
 
@@ -181,6 +199,7 @@ fn event(e &gg.Event, mut app App) {
 							app.t = 0
 						}
 					}
+
 					// TODO
 					if app.i > 10 {
 						app.i -= 10
@@ -223,9 +242,8 @@ fn (mut app App) resize() {
 	// calculate ideal key count/width based on the current window width
 	app.white_key_count = int(f32(ww) / default_key_width + 0.5) // round
 	app.key_width = f32(ww) / app.white_key_count // will be 45 ± some decimal
-
 	if app.start_note + app.white_key_count >= 127 {
-		app.start_note = byte(128 - app.white_key_count)
+		app.start_note = u8(128 - app.white_key_count)
 	}
 	app.check_bounds()
 }
@@ -236,14 +254,24 @@ fn (mut app App) check_bounds() {
 		app.start_note = 0
 	}
 
-	mut midi := byte(app.start_note)
+	mut midi := u8(app.start_note)
 	for _ in 0 .. app.white_key_count {
-		if octave[midi % octave.len] == .black { midi += 2 } else { midi++ }
+		if octave[midi % octave.len] == .black {
+			midi += 2
+		} else {
+			midi++
+		}
 	}
-	if midi <= 128 { return }
+	if midi <= 128 {
+		return
+	}
 
 	for midi > 127 {
-		if octave[midi % octave.len] == .black { midi -= 2 } else { midi-- }
+		if octave[midi % octave.len] == .black {
+			midi -= 2
+		} else {
+			midi--
+		}
 		app.start_note--
 	}
 
