@@ -1,14 +1,14 @@
 import gg
 import os
 import time
-
+import os.font
 import audio
 import vidi
 
 struct App {
 mut:
-	gg              &gg.Context = voidptr(0)
-	vidi            &vidi.Context = voidptr(0)
+	gg              &gg.Context    = voidptr(0)
+	vidi            &vidi.Context  = voidptr(0)
 	audio           &audio.Context = voidptr(0)
 	sustained       bool
 	win_width       int = 1280
@@ -17,19 +17,18 @@ mut:
 	key_height      f32 = 200
 	white_key_count int
 	keys            [128]Key
-	start_note      byte = 41
-
+	start_note      u8 = 41
 	// whether the current song is paused
 	paused bool
 	// the current tempo multiplier
-	tempo  f32 = 1.0
+	tempo f32 = 1.0
 	// info about the current song:
 	// the notes that make it up
 	notes []Note
 	// the current timestamp (in ns)
-	t     u64
+	t u64
 	// the index of the first note currently being played in the song
-	i     u32
+	i u32
 	// the current song's length in ns
 	song_len u64
 }
@@ -38,14 +37,14 @@ struct Note {
 mut:
 	start u64
 	len   u32
-	midi  byte
-	vel   byte
+	midi  u8
+	vel   u8
 }
 
 fn (n Note) str() string {
 	a := int(n.midi)
-	b := f64(n.start)  / time.second
-	c := f64(n.start+n.len) / time.second
+	b := f64(n.start) / time.second
+	c := f64(n.start + n.len) / time.second
 	return '\n  [$a] $b - $c'
 }
 
@@ -77,18 +76,18 @@ fn main() {
 		frame_fn: frame
 		event_fn: event
 		user_data: app
-		font_path: gg.system_font_path()
+		font_path: font.default()
 		sample_count: 4
 	)
 
 	if os.args.len > 1 {
-		app.parse_midi_file(os.args[1])  or {
+		app.parse_midi_file(os.args[1]) or {
 			eprintln('failed to parse midi file `${os.args[1]}`: $err')
 			return
 		}
 
 		mut song_len := u64(0)
-		mut notes_needed := map[byte]u16{}
+		mut notes_needed := map[u8]u16{}
 		for note in app.notes {
 			if note.start + note.len > song_len {
 				song_len = note.start + note.len
@@ -100,7 +99,8 @@ fn main() {
 
 		notes_per_second := f64(app.notes.len) / f64(app.song_len) * f64(time.second)
 		difficulties := ['easy', 'medium', 'hard', 'very hard', 'extreme']!
-		println('total notes: $app.notes.len (${notes_per_second:.1f} notes/sec, difficulty: ${difficulties[clamp<byte>(byte(notes_per_second / 3.3), 0, 4)]})')
+		println('total notes: $app.notes.len (${notes_per_second:.1f} notes/sec, difficulty: ${difficulties[clamp<u8>(u8(notes_per_second / 3.3),
+			0, 4)]})')
 
 		mut keys := notes_needed.keys()
 		keys.sort()
